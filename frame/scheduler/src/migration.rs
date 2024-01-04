@@ -98,10 +98,16 @@ pub mod v3 {
 	impl<T: Config<Hash = PreimageHash>> OnRuntimeUpgrade for MigrateToV4<T> {
 		#[cfg(feature = "try-runtime")]
 		fn pre_upgrade() -> Result<Vec<u8>, &'static str> {
+			log::info!("TEEEEEEEEEEEEEEEEEEEESTING");
 			assert_eq!(StorageVersion::get::<Pallet<T>>(), 3, "Can only upgrade from version 3");
 
 			let agendas = Agenda::<T>::iter_keys().count() as u32;
+			let decodable_agendas_v1 = v1::Agenda::<T>::iter_values().count() as u32;
+			let decodable_agendas_v2 = v2::Agenda::<T>::iter_values().count() as u32;
+			log::info!("Decodable agendas v1 {:?}", decodable_agendas_v1);
+			log::info!("Decodable agendas v2 {:?}", decodable_agendas_v2);
 			let decodable_agendas = Agenda::<T>::iter_values().count() as u32;
+			log::info!("Decodable agendas v3 {:?}", decodable_agendas);
 			if agendas != decodable_agendas {
 				// This is not necessarily an error, but can happen when there are Calls
 				// in an Agenda that are not valid anymore with the new runtime.
@@ -112,11 +118,11 @@ pub mod v3 {
 					agendas
 				);
 			}
-			log::info!(target: TARGET, "Trying to migrate {} agendas...", decodable_agendas);
+			log::info!(target: TARGET, "Trying to migrate {} agendas...", decodable_agendas_v1);
 
 			// Check that no agenda overflows `MaxScheduledPerBlock`.
 			let max_scheduled_per_block = T::MaxScheduledPerBlock::get() as usize;
-			for (block_number, agenda) in Agenda::<T>::iter() {
+			for (block_number, agenda) in v1::Agenda::<T>::iter() {
 				if agenda.iter().cloned().filter_map(|s| s).count() > max_scheduled_per_block {
 					log::error!(
 						target: TARGET,
@@ -130,27 +136,23 @@ pub mod v3 {
 			}
 			// Check that bounding the calls will not overflow `MAX_LENGTH`.
 			let max_length = T::Preimages::MAX_LENGTH as usize;
-			for (block_number, agenda) in Agenda::<T>::iter() {
+			for (block_number, agenda) in v1::Agenda::<T>::iter() {
 				for schedule in agenda.iter().cloned().filter_map(|s| s) {
-					match schedule.call {
-						frame_support::traits::schedule::MaybeHashed::Value(call) => {
-							let l = call.using_encoded(|c| c.len());
-							if l > max_length {
-								log::error!(
-									target: TARGET,
-									"Call in agenda of block {:?} is too large: {} byte",
-									block_number,
-									l,
-								);
-								return Err("Call is too large.")
-							}
-						},
-						_ => (),
+					
+					let l = schedule.call.using_encoded(|c| c.len());
+					if l > max_length {
+						log::error!(
+							target: TARGET,
+							"Call in agenda of block {:?} is too large: {} byte",
+							block_number,
+							l,
+						);
+						return Err("Call is too large.")
 					}
 				}
 			}
 
-			Ok((decodable_agendas as u32).encode())
+			Ok((decodable_agendas_v1 as u32).encode())
 		}
 
 		fn on_runtime_upgrade() -> Weight {
@@ -165,7 +167,9 @@ pub mod v3 {
 				return T::DbWeight::get().reads(1)
 			}
 
-			crate::Pallet::<T>::migrate_v3_to_v4()
+			log::warn!("force migrating v1 to v4");
+
+			crate::Pallet::<T>::migrate_v1_to_v4()
 		}
 
 		#[cfg(feature = "try-runtime")]

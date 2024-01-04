@@ -68,10 +68,14 @@ pub mod v1 {
 			log::info!(target: TARGET, "{} public proposals will be migrated.", props_count,);
 			ensure!(props_count <= T::MaxProposals::get() as usize, "too many proposals");
 
-			let referenda_count = v0::ReferendumInfoOf::<T>::iter().count();
-			log::info!(target: TARGET, "{} referenda will be migrated.", referenda_count);
+			let mut referenda_count = v0::ReferendumInfoOf::<T>::iter().count();
 
-			Ok((props_count as u32, referenda_count as u32).encode())
+			//Assumption. This should be able to count all referenda (both old and new layout) 
+			let referenda_v1_count = ReferendumInfoOf::<T>::iter().count();
+			log::info!(target: TARGET, "{} referenda will be migrated.", referenda_count);
+			
+			
+			Ok((props_count as u32, referenda_v1_count as u32).encode())
 		}
 
 		#[allow(deprecated)]

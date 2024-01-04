@@ -81,8 +81,21 @@ pub mod v1 {
 		fn pre_upgrade() -> Result<Vec<u8>, &'static str> {
 			assert_eq!(StorageVersion::get::<Pallet<T>>(), 0, "can only upgrade from version 0");
 
-			let images = v0::image_count::<T>().expect("v0 storage corrupted");
-			log::info!(target: TARGET, "Migrating {} images", &images);
+			let images_v0 = v0::PreimageFor::<T>::iter_values().count() as u32;
+			let status_v0 = v0::StatusFor::<T>::iter_values().count() as u32;
+
+			let images_v1 = PreimageFor::<T>::iter_values().count() as u32;
+			let status_v1 = StatusFor::<T>::iter_values().count() as u32;
+
+			log::info!("v0 {:?} images", images_v0);
+			log::info!("v0 {:?} statuses", status_v0);
+			log::info!("v1 {:?} images", images_v1);
+			log::info!("v1 {:?} statuses", status_v1);
+
+
+			//let images = v0::image_count::<T>().expect("v0 storage corrupted");
+			//log::info!(target: TARGET, "Migrating {} images", &images);
+			let images= images_v1;
 			Ok((images as u32).encode())
 		}
 
@@ -97,48 +110,49 @@ pub mod v1 {
 				return weight
 			}
 
-			let status = v0::StatusFor::<T>::drain().collect::<Vec<_>>();
+			let status = StatusFor::<T>::drain().collect::<Vec<_>>();
 			weight.saturating_accrue(T::DbWeight::get().reads(status.len() as u64));
 
 			let preimages = v0::PreimageFor::<T>::drain().collect::<BTreeMap<_, _>>();
 			weight.saturating_accrue(T::DbWeight::get().reads(preimages.len() as u64));
 
 			for (hash, status) in status.into_iter() {
-				let preimage = if let Some(preimage) = preimages.get(&hash) {
-					preimage
-				} else {
-					log::error!(target: TARGET, "preimage not found for hash {:?}", &hash);
-					continue
-				};
-				let len = preimage.len() as u32;
-				if len > MAX_SIZE {
-					log::error!(
-						target: TARGET,
-						"preimage too large for hash {:?}, len: {}",
-						&hash,
-						len
-					);
-					continue
-				}
+				log::error!(target: TARGET, "status hash {:?}", &hash);
+				// let preimage = if let Some(preimage) = preimages.get(&hash) {
+				// 	preimage
+				// } else {
+				// 	log::error!(target: TARGET, "preimage not found for hash {:?}", &hash);
+				// 	continue
+				// };
+				// let len = preimage.len() as u32;
+				// if len > MAX_SIZE {
+				// 	log::error!(
+				// 		target: TARGET,
+				// 		"preimage too large for hash {:?}, len: {}",
+				// 		&hash,
+				// 		len
+				// 	);
+				// 	continue
+				// }
 
-				let status = match status {
-					v0::RequestStatus::Unrequested(deposit) => match deposit {
-						Some(deposit) => RequestStatus::Unrequested { deposit, len },
-						// `None` depositor becomes system-requested.
-						None =>
-							RequestStatus::Requested { deposit: None, count: 1, len: Some(len) },
-					},
-					v0::RequestStatus::Requested(count) if count == 0 => {
-						log::error!(target: TARGET, "preimage has counter of zero: {:?}", hash);
-						continue
-					},
-					v0::RequestStatus::Requested(count) =>
-						RequestStatus::Requested { deposit: None, count, len: Some(len) },
-				};
-				log::trace!(target: TARGET, "Moving preimage {:?} with len {}", hash, len);
+				// let status = match status {
+				// 	v0::RequestStatus::Unrequested(deposit) => match deposit {
+				// 		Some(deposit) => RequestStatus::Unrequested { deposit, len },
+				// 		// `None` depositor becomes system-requested.
+				// 		None =>
+				// 			RequestStatus::Requested { deposit: None, count: 1, len: Some(len) },
+				// 	},
+				// 	v0::RequestStatus::Requested(count) if count == 0 => {
+				// 		log::error!(target: TARGET, "preimage has counter of zero: {:?}", hash);
+				// 		continue
+				// 	},
+				// 	v0::RequestStatus::Requested(count) =>
+				// 		RequestStatus::Requested { deposit: None, count, len: Some(len) },
+				// };
+				// log::trace!(target: TARGET, "Moving preimage {:?} with len {}", hash, len);
 
-				crate::StatusFor::<T>::insert(hash, status);
-				crate::PreimageFor::<T>::insert(&(hash, len), preimage);
+				// crate::StatusFor::<T>::insert(hash, status);
+				// crate::PreimageFor::<T>::insert(&(hash, len), preimage);
 
 				weight.saturating_accrue(T::DbWeight::get().writes(2));
 			}

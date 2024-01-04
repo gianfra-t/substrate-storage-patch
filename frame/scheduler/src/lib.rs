@@ -168,7 +168,7 @@ pub mod pallet {
 	use frame_support::{dispatch::PostDispatchInfo, pallet_prelude::*};
 	use frame_system::pallet_prelude::*;
 
-	/// The current storage version.
+	//;/ The current storage version.
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
 
 	#[pallet::pallet]
@@ -439,10 +439,11 @@ impl<T: Config<Hash = PreimageHash>> Pallet<T> {
 		>(|_, agenda| {
 			Some(BoundedVec::truncate_from(
 				agenda
+					.clone()
 					.into_iter()
 					.map(|schedule| {
 						weight.saturating_accrue(T::DbWeight::get().reads_writes(1, 1));
-
+						log::info!("translating v1 agenda {:?}", agenda);
 						schedule.and_then(|schedule| {
 							if let Some(id) = schedule.maybe_id.as_ref() {
 								let name = blake2_256(id);
