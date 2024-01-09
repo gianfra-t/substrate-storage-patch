@@ -25,12 +25,18 @@ pub mod v1 {
 
 	#[cfg(feature = "try-runtime")]
 	pub fn pre_migrate<T: Config>() -> Result<(), &'static str> {
+    use frame_support::StoragePrefixedMap;
+
 		assert!(StorageVersion::<T>::get() == Releases::V0, "Storage version too high.");
 
-		log::debug!(
-			target: "runtime::vesting",
-			"migration: Vesting storage version v1 PRE migration checks succesful!"
-		);
+		for (key,vesting) in Vesting::<T>::iter(){
+			for inner_vesting in vesting.into_iter() {
+				log::info!("vest for key {:?} ", key);
+				log::info!("vest amount {:?} ", inner_vesting.locked());
+			}
+
+		}
+
 
 		Ok(())
 	}
@@ -39,27 +45,68 @@ pub mod v1 {
 	/// WARNING: This migration will delete schedules if `MaxVestingSchedules < 1`.
 	pub fn migrate<T: Config>() -> Weight {
 		let mut reads_writes = 0;
+		log::info!("migrating vesting");
+		// Vesting::<T>::translate::<VestingInfo<BalanceOf<T>, T::BlockNumber>, _>(
+		// 	|_key, vesting_info| {
+		// 		reads_writes += 1;
+		// 		let v: Option<
+		// 			BoundedVec<
+		// 				VestingInfo<BalanceOf<T>, T::BlockNumber>,
+		// 				MaxVestingSchedulesGet<T>,
+		// 			>,
+		// 		> = vec![vesting_info].try_into().ok();
 
-		Vesting::<T>::translate::<VestingInfo<BalanceOf<T>, T::BlockNumber>, _>(
-			|_key, vesting_info| {
-				reads_writes += 1;
-				let v: Option<
-					BoundedVec<
-						VestingInfo<BalanceOf<T>, T::BlockNumber>,
-						MaxVestingSchedulesGet<T>,
-					>,
-				> = vec![vesting_info].try_into().ok();
+		// 		if v.is_none() {
+		// 			log::warn!(
+		// 				target: "runtime::vesting",
+		// 				"migration: Failed to move a vesting schedule into a BoundedVec"
+		// 			);
+		// 		}
+				
+		// 		v
+		// 	},
+		// );
 
-				if v.is_none() {
-					log::warn!(
-						target: "runtime::vesting",
-						"migration: Failed to move a vesting schedule into a BoundedVec"
-					);
-				}
 
-				v
-			},
-		);
+		// let translate = |pre: VestingInfo<BalanceOf<T>, T::BlockNumber>| -> Option<
+		// BoundedVec<
+		// 	VestingInfo<BalanceOf<T>, T::BlockNumber>,
+		// 	MaxVestingSchedulesGet<T>,
+		// >> {
+		// 	let v: Option<
+		// 			BoundedVec<
+		// 				VestingInfo<BalanceOf<T>, T::BlockNumber>,
+		// 				MaxVestingSchedulesGet<T>,
+		// 			>,
+		// 		> = vec![pre].try_into().ok();
+
+		// 		if v.is_none() {
+		// 			log::warn!(
+		// 				target: "runtime::vesting",
+		// 				"migration: Failed to move a vesting schedule into a BoundedVec"
+		// 			);
+		// 		}
+				
+		// 		v
+			
+		// };
+
+		let translate = |pre: 
+		BoundedVec<
+			VestingInfo<BalanceOf<T>, T::BlockNumber>,
+			MaxVestingSchedulesGet<T>,
+		> | -> Option<
+		BoundedVec<
+			VestingInfo<BalanceOf<T>, T::BlockNumber>,
+			MaxVestingSchedulesGet<T>,
+		>> {
+			Some(pre)
+			
+		};
+
+		Vesting::<T>::translate_values(translate);
+
+		StorageVersion::<T>::put(Releases::V1);
 
 		T::DbWeight::get().reads_writes(reads_writes, reads_writes)
 	}

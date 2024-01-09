@@ -110,7 +110,7 @@ pub mod v1 {
 				return weight
 			}
 
-			let status = StatusFor::<T>::drain().collect::<Vec<_>>();
+			let status = v0::StatusFor::<T>::drain().collect::<Vec<_>>();
 			weight.saturating_accrue(T::DbWeight::get().reads(status.len() as u64));
 
 			let preimages = v0::PreimageFor::<T>::drain().collect::<BTreeMap<_, _>>();
@@ -118,37 +118,44 @@ pub mod v1 {
 
 			for (hash, status) in status.into_iter() {
 				log::error!(target: TARGET, "status hash {:?}", &hash);
-				// let preimage = if let Some(preimage) = preimages.get(&hash) {
-				// 	preimage
-				// } else {
-				// 	log::error!(target: TARGET, "preimage not found for hash {:?}", &hash);
-				// 	continue
-				// };
-				// let len = preimage.len() as u32;
-				// if len > MAX_SIZE {
-				// 	log::error!(
-				// 		target: TARGET,
-				// 		"preimage too large for hash {:?}, len: {}",
-				// 		&hash,
-				// 		len
-				// 	);
-				// 	continue
-				// }
+				let preimage = if let Some(preimage) = preimages.get(&hash) {
+					preimage
+				} else {
+					log::error!(target: TARGET, "preimage not found for hash {:?}", &hash);
+					continue
+				};
+				let len = preimage.len() as u32;
+				if len > MAX_SIZE {
+					log::error!(
+						target: TARGET,
+						"preimage too large for hash {:?}, len: {}",
+						&hash,
+						len
+					);
+					continue
+				}
 
-				// let status = match status {
-				// 	v0::RequestStatus::Unrequested(deposit) => match deposit {
-				// 		Some(deposit) => RequestStatus::Unrequested { deposit, len },
-				// 		// `None` depositor becomes system-requested.
-				// 		None =>
-				// 			RequestStatus::Requested { deposit: None, count: 1, len: Some(len) },
-				// 	},
-				// 	v0::RequestStatus::Requested(count) if count == 0 => {
-				// 		log::error!(target: TARGET, "preimage has counter of zero: {:?}", hash);
-				// 		continue
-				// 	},
-				// 	v0::RequestStatus::Requested(count) =>
-				// 		RequestStatus::Requested { deposit: None, count, len: Some(len) },
-				// };
+				let status = match status {
+					v0::RequestStatus::Unrequested(deposit) => match deposit {
+						Some(deposit) => {
+							log::info!(target: TARGET, "unrequested deposit {:?} ",&deposit);
+							RequestStatus::Unrequested { deposit, len }},
+						// `None` depositor becomes system-requested.
+						None =>
+							RequestStatus::Requested { deposit: None, count: 1, len: Some(len) },
+					},
+					v0::RequestStatus::Requested(count) if count == 0 => {
+						
+						log::error!(target: TARGET, "preimage has counter of zero: {:?}", hash);
+						continue
+					},
+					v0::RequestStatus::Requested(count) =>
+					{
+						log::info!(target: TARGET, "requested count {:?} ",&count);
+						RequestStatus::Requested { deposit: None, count, len: Some(len) }
+					
+					},
+				};
 				// log::trace!(target: TARGET, "Moving preimage {:?} with len {}", hash, len);
 
 				// crate::StatusFor::<T>::insert(hash, status);

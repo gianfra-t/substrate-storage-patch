@@ -73,6 +73,7 @@ pub mod v2 {
 
 pub mod v3 {
 	use super::*;
+	use super::Agenda as AgendaV4;
 	use frame_support::pallet_prelude::*;
 
 	#[frame_support::storage_alias]
@@ -98,7 +99,6 @@ pub mod v3 {
 	impl<T: Config<Hash = PreimageHash>> OnRuntimeUpgrade for MigrateToV4<T> {
 		#[cfg(feature = "try-runtime")]
 		fn pre_upgrade() -> Result<Vec<u8>, &'static str> {
-			log::info!("TEEEEEEEEEEEEEEEEEEEESTING");
 			assert_eq!(StorageVersion::get::<Pallet<T>>(), 3, "Can only upgrade from version 3");
 
 			let agendas = Agenda::<T>::iter_keys().count() as u32;
@@ -106,8 +106,28 @@ pub mod v3 {
 			let decodable_agendas_v2 = v2::Agenda::<T>::iter_values().count() as u32;
 			log::info!("Decodable agendas v1 {:?}", decodable_agendas_v1);
 			log::info!("Decodable agendas v2 {:?}", decodable_agendas_v2);
-			let decodable_agendas = Agenda::<T>::iter_values().count() as u32;
-			log::info!("Decodable agendas v3 {:?}", decodable_agendas);
+			let decodable_agendas_v3 = Agenda::<T>::iter_values().count() as u32;
+			log::info!("Decodable agendas v3 {:?}", decodable_agendas_v3);
+
+			let decodable_agendas_v4 = AgendaV4::<T>::iter_values().count() as u32;
+			log::info!("Decodable agendas v4 {:?}", decodable_agendas_v4);
+
+			let decodable_agendas = decodable_agendas_v4;
+
+			for (_key,agenda_v1) in v1::Agenda::<T>::iter(){
+				
+				for schedule in agenda_v1.into_iter(){
+					let schedule_v1 =  schedule.unwrap();
+					log::info!("priority for v1 version{:?}", schedule_v1.priority);
+					log::info!("id for v1 version {:?}", schedule_v1.maybe_id);
+					log::info!("call for v1 version  {:?}", schedule_v1.call);
+					log::info!("periodic for v1 version {:?}", schedule_v1.maybe_periodic);
+				}
+				
+
+
+			}
+
 			if agendas != decodable_agendas {
 				// This is not necessarily an error, but can happen when there are Calls
 				// in an Agenda that are not valid anymore with the new runtime.
@@ -167,8 +187,8 @@ pub mod v3 {
 				return T::DbWeight::get().reads(1)
 			}
 
-			log::warn!("force migrating v1 to v4");
 
+			//WARNING
 			crate::Pallet::<T>::migrate_v1_to_v4()
 		}
 
